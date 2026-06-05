@@ -57,6 +57,8 @@ export default function PackageDetails() {
     }
   }, [campaign, staticPkg])
 
+  const detailsHasHtml = /<[^>]+>/.test(String(pkg?.details || ''))
+
   if (loading) {
     return (
       <div className="details-page">
@@ -108,7 +110,9 @@ export default function PackageDetails() {
           </div>
 
           <h3>How it works</h3>
-          <p>{pkg.details}</p>
+          {detailsHasHtml
+            ? <div dangerouslySetInnerHTML={{ __html: pkg.details }} />
+            : <p>{pkg.details}</p>}
 
           <div className="details-cta">
             <button className="btn-primary" style={{ flex: 1, justifyContent: 'center' }} onClick={() => navigate(`/register/${slug}?step=1`)}>

@@ -1,5 +1,6 @@
 import Hero         from '../components/sections/Hero'
 import UseCases     from '../components/sections/UseCases'
+import SeasonalPromotions from '../components/sections/SeasonalPromotions'
 import WhySection   from '../components/sections/WhySection'
 import GalleryStrip from '../components/sections/GalleryStrip'
 import Packages     from '../components/sections/Packages'
@@ -28,6 +29,7 @@ export default function Home() {
       </div>
       <Hero />
       <UseCases />
+      <SeasonalPromotions />
       <WhySection />
       <GalleryStrip />
       <Packages />

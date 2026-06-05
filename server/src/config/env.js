@@ -21,5 +21,20 @@ export const config = {
     cookieName: process.env.SESSION_COOKIE_NAME || 'rc_admin_session',
     secret: process.env.SESSION_SECRET,
   },
+  payment: {
+    webhookSecret: process.env.PAYMENT_WEBHOOK_SECRET || '',
+  },
+  mail: {
+    host: process.env.SMTP_HOST || '',
+    port: Number(process.env.SMTP_PORT || 587),
+    user: process.env.SMTP_USER || '',
+    pass: process.env.SMTP_PASS || '',
+    from: process.env.SMTP_FROM || 'no-reply@rugcircle.com',
+  },
+  support: {
+    whatsappNumber: process.env.SUPPORT_WHATSAPP_NUMBER || '',
+    email: process.env.SUPPORT_EMAIL || '',
+    phone: process.env.SUPPORT_PHONE || '',
+  },
 }
 

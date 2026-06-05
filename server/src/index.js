@@ -1,4 +1,5 @@
-﻿import express from 'express'
+import express from 'express'
+import path from 'node:path'
 import helmet from 'helmet'
 import cors from 'cors'
 import cookieParser from 'cookie-parser'
@@ -6,15 +7,23 @@ import rateLimit from 'express-rate-limit'
 import { config } from './config/env.js'
 import authRoutes from './routes/auth.js'
 import adminRoutes from './routes/admin.js'
+import userRoutes from './routes/user.js'
 import { pool } from './lib/db.js'
 import { errorHandler } from './middleware/errorHandler.js'
 
 const app = express()
 
-app.use(helmet())
-app.use(cors({ origin: config.adminUiOrigin, credentials: true }))
+app.use(helmet({
+  crossOriginResourcePolicy: false,
+  crossOriginEmbedderPolicy: false,
+}))
+app.use(cors())
 app.use(express.json({ limit: '1mb' }))
 app.use(cookieParser(config.session.secret))
+app.use('/uploads', (req, res, next) => {
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin')
+  next()
+}, express.static(path.resolve(process.cwd(), 'server', 'uploads')))
 
 app.use(
   '/api/auth',
@@ -30,7 +39,7 @@ app.get('/api/health', (_req, res) => res.json({ ok: true }))
 app.get('/api/public/campaigns', async (_req, res, next) => {
   try {
     const [rows] = await pool.query(
-      `SELECT id, slug, name, location, city,
+      `SELECT id, slug, campaign_type AS campaignType, seasonal_label AS seasonalLabel, name, location, city,
               DATE_FORMAT(workshop_date, '%Y-%m-%d') AS workshopDate,
               DATE_FORMAT(start_time, '%H:%i') AS startTime,
               price_pp AS price,
@@ -49,7 +58,7 @@ app.get('/api/public/campaigns/:slug', async (req, res, next) => {
   try {
     const slug = String(req.params.slug || '').trim().toLowerCase()
     const [rows] = await pool.query(
-      `SELECT c.id, c.slug, c.name, c.location, c.city,
+      `SELECT c.id, c.slug, c.campaign_type AS campaignType, c.seasonal_label AS seasonalLabel, c.name, c.location, c.city,
               DATE_FORMAT(workshop_date, '%Y-%m-%d') AS workshopDate,
               DATE_FORMAT(start_time, '%H:%i') AS startTime,
               c.price_pp AS price,
@@ -66,7 +75,8 @@ app.get('/api/public/campaigns/:slug', async (req, res, next) => {
               cc.itinerary,
               cc.faq,
               cc.terms_and_policy AS termsAndPolicy,
-              cc.gallery
+              cc.gallery,
+              cc.product_ids_json AS productIdsJson
        FROM campaigns c
        LEFT JOIN campaign_content cc ON cc.campaign_id = c.id
        WHERE c.slug = ?
@@ -84,6 +94,19 @@ app.get('/api/public/campaigns/:slug', async (req, res, next) => {
     row.itinerary = parseMaybeJson(row.itinerary, [])
     row.faq = parseMaybeJson(row.faq, [])
     row.gallery = parseMaybeJson(row.gallery, [])
+    const productIds = parseMaybeJson(row.productIdsJson, []).map((v) => Number(v)).filter((v) => Number.isInteger(v) && v > 0)
+    if (productIds.length > 0) {
+      const [productRows] = await pool.query(
+        `SELECT id, title, price, description, main_image_url AS mainImageUrl, gallery_images_json AS galleryImagesJson
+         FROM products
+         WHERE id IN (?) ORDER BY id ASC`,
+        [productIds],
+      )
+      const byId = new Map(productRows.map((p) => [p.id, { ...p, galleryImages: parseMaybeJson(p.galleryImagesJson, []) }]))
+      row.products = productIds.map((id) => byId.get(id)).filter(Boolean)
+    } else {
+      row.products = []
+    }
     res.json({ ok: true, campaign: row })
   } catch (err) {
     next(err)
@@ -91,6 +114,7 @@ app.get('/api/public/campaigns/:slug', async (req, res, next) => {
 })
 app.use('/api/auth', authRoutes)
 app.use('/api/admin', adminRoutes)
+app.use('/api/user', userRoutes)
 
 app.use(errorHandler)
 
