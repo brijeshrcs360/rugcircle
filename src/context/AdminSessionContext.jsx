@@ -8,6 +8,13 @@ export function AdminSessionProvider({ children }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    const path = window.location.pathname || '/'
+    const shouldCheckAdmin = path.startsWith('/admin')
+    if (!shouldCheckAdmin) {
+      setSession(null)
+      setLoading(false)
+      return
+    }
     api.me()
       .then((res) => setSession(res.user))
       .catch(() => setSession(null))

@@ -7,14 +7,16 @@ import { AlertCircle, CheckCircle2 } from 'lucide-react'
 export default function Step4ReviewConfirm() {
   const { slug } = useParams()
   const navigate = useNavigate()
-  const { registration, updateStep } = useRegistration()
+  const { registration, updateStep, updatePaymentInfo } = useRegistration()
   const [termsAccepted, setTermsAccepted] = useState(false)
 
-  const campaignPrice = 5500 // Dummy price (replace with actual)
+  const campaignPrice = 5500
   const quantity = 1
   const subtotal = campaignPrice * quantity
   const gst = Math.round(subtotal * 0.18)
   const total = subtotal + gst
+  const paymentPercent = Number(registration.payment_percent || 50)
+  const payableNow = paymentPercent === 50 ? Math.round(total * 0.5) : total
 
   const handleNext = () => {
     if (!termsAccepted) return
@@ -32,255 +34,222 @@ export default function Step4ReviewConfirm() {
   return (
     <RegistrationLayout currentStep={4} onBack={handleBack} title="Review Your Registration">
       <div className="review-container">
+        <div className="review-hero">
+          <p className="review-eyebrow">Final Check</p>
+          <h2>Review Before Payment</h2>
+          <p>Confirm your details and payment choice. Then continue to secure payment.</p>
+        </div>
+
         <div className="review-cards">
-          {/* Personal Info Card */}
           <div className="review-card">
-            <h3 className="card-title">
-              <CheckCircle2 size={18} /> Your Details
-            </h3>
+            <h3 className="card-title"><CheckCircle2 size={18} /> Your Details</h3>
             <div className="card-content">
-              <div className="info-row">
-                <span className="label">Name</span>
-                <span className="value">{fullName}</span>
-              </div>
-              <div className="info-row">
-                <span className="label">Email</span>
-                <span className="value">{registration.contact_info.email}</span>
-              </div>
-              <div className="info-row">
-                <span className="label">Mobile</span>
-                <span className="value">{registration.contact_info.mobile}</span>
-              </div>
-              <div className="info-row">
-                <span className="label">Company</span>
-                <span className="value">{registration.contact_info.company}</span>
-              </div>
+              <div className="info-row"><span className="label">Name</span><span className="value">{fullName}</span></div>
+              <div className="info-row"><span className="label">Email</span><span className="value">{registration.contact_info.email}</span></div>
+              <div className="info-row"><span className="label">Mobile</span><span className="value">{registration.contact_info.mobile}</span></div>
+              <div className="info-row"><span className="label">Company</span><span className="value">{registration.contact_info.company}</span></div>
             </div>
           </div>
 
-          {/* Design Card */}
           <div className="review-card">
-            <h3 className="card-title">
-              <CheckCircle2 size={18} /> Selected Design
-            </h3>
+            <h3 className="card-title"><CheckCircle2 size={18} /> Selected Product</h3>
             <div className="card-content">
-              <div className="info-row">
-                <span className="label">Design</span>
-                <span className="value">{registration.selected_design_name || 'Not selected'}</span>
-              </div>
+              <div className="info-row"><span className="label">Product</span><span className="value">{registration.selected_design_name || 'Not selected'}</span></div>
             </div>
           </div>
 
-          {/* Pricing Card */}
           <div className="review-card">
-            <h3 className="card-title">
-              <CheckCircle2 size={18} /> Pricing
-            </h3>
+            <h3 className="card-title"><CheckCircle2 size={18} /> Pricing</h3>
             <div className="card-content pricing">
-              <div className="info-row">
-                <span className="label">Workshop Fee</span>
-                <span className="value">₹{campaignPrice.toLocaleString()}</span>
-              </div>
-              <div className="info-row">
-                <span className="label">GST (18%)</span>
-                <span className="value">₹{gst.toLocaleString()}</span>
-              </div>
+              <div className="info-row"><span className="label">Workshop Fee</span><span className="value">Rs {campaignPrice.toLocaleString()}</span></div>
+              <div className="info-row"><span className="label">GST (18%)</span><span className="value">Rs {gst.toLocaleString()}</span></div>
               <div className="divider" />
-              <div className="info-row total">
-                <span className="label">Total Amount</span>
-                <span className="value">₹{total.toLocaleString()}</span>
+              <div className="info-row total"><span className="label">Total Amount</span><span className="value">Rs {total.toLocaleString()}</span></div>
+              <div className="divider" />
+              <div className="info-row">
+                <span className="label">Payment Option</span>
+                <span className="value">
+                  <select value={paymentPercent} onChange={(e) => updatePaymentInfo(Number(e.target.value))}>
+                    <option value={50}>Pay 50% now</option>
+                    <option value={100}>Pay 100% now</option>
+                  </select>
+                </span>
               </div>
+              <div className="info-row total"><span className="label">Payable Now</span><span className="value">Rs {payableNow.toLocaleString()}</span></div>
             </div>
           </div>
 
-          {/* Terms Card */}
           <div className="review-card terms-card">
-            <h3 className="card-title">
-              <AlertCircle size={18} /> Terms & Conditions
-            </h3>
+            <h3 className="card-title"><AlertCircle size={18} /> Terms & Conditions</h3>
             <div className="card-content">
               <div className="checkbox-group">
-                <input
-                  id="terms"
-                  type="checkbox"
-                  checked={termsAccepted}
-                  onChange={(e) => setTermsAccepted(e.target.checked)}
-                />
-                <label htmlFor="terms">
-                  I agree to the <a href="/terms">terms and conditions</a> and understand the cancellation policy
-                </label>
+                <input id="terms" type="checkbox" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} />
+                <label htmlFor="terms">I agree to the <a href="/terms">terms and conditions</a> and understand the cancellation policy</label>
               </div>
             </div>
           </div>
         </div>
 
         <div className="form-actions">
-          <button type="button" className="btn-secondary" onClick={handleBack}>
-            Back
-          </button>
-          <button type="button" className="btn-primary" onClick={handleNext} disabled={!termsAccepted}>
-            Next: Payment
-          </button>
+          <button type="button" className="btn-secondary" onClick={handleBack}>Back</button>
+          <button type="button" className="btn-primary" onClick={handleNext} disabled={!termsAccepted}>Next: Payment</button>
         </div>
       </div>
 
       <style jsx>{`
         .review-container {
-          display: flex;
-          flex-direction: column;
-          gap: 24px;
+          display: grid;
+          gap: 18px;
+        }
+
+        .review-hero {
+          border: 1px solid var(--color-border);
+          border-radius: 16px;
+          padding: 18px;
+          background:
+            radial-gradient(120% 140% at 0% 0%, rgba(225, 128, 45, 0.13) 0%, rgba(225, 128, 45, 0.04) 45%, rgba(255,255,255,0.95) 100%),
+            #fff;
+        }
+
+        .review-hero h2 {
+          margin: 0;
+          font-size: 28px;
+          letter-spacing: -0.4px;
+          color: #1f1a17;
+        }
+
+        .review-hero p {
+          margin: 8px 0 0;
+          color: #6d5e53;
+          font-size: 14px;
+          line-height: 1.5;
+        }
+
+        .review-eyebrow {
+          margin: 0 0 6px !important;
+          font-size: 11px !important;
+          letter-spacing: 1.4px;
+          text-transform: uppercase;
+          color: #b86b22 !important;
+          font-weight: 700;
         }
 
         .review-cards {
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 14px;
         }
 
         .review-card {
-          background: white;
-          border: 1.5px solid var(--color-border);
-          border-radius: 12px;
-          padding: 20px;
-        }
-
-        .review-card.terms-card {
-          background: rgba(225, 128, 45, 0.05);
-          border-color: var(--color-primary);
+          background: #fff;
+          border: 1px solid var(--color-border);
+          border-radius: 14px;
+          padding: 14px;
+          box-shadow: 0 8px 24px rgba(26, 22, 22, 0.04);
         }
 
         .card-title {
-          font-size: 14px;
-          font-weight: 700;
-          margin: 0 0 16px 0;
-          color: var(--color-text);
+          margin: 0 0 10px;
           display: flex;
           align-items: center;
           gap: 8px;
-        }
-
-        .card-title svg {
-          color: var(--color-secondary);
+          font-size: 18px;
+          color: #1f1a17;
         }
 
         .card-content {
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
+          display: grid;
+          gap: 8px;
         }
 
         .info-row {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 12px;
-          font-size: 14px;
-        }
-
-        .info-row.total {
-          font-weight: 700;
-          padding-top: 8px;
-          border-top: 1px solid var(--color-border);
+          display: grid;
+          grid-template-columns: 130px 1fr;
+          gap: 8px;
+          align-items: start;
         }
 
         .label {
-          color: var(--color-text);
-          opacity: 0.6;
+          color: #7a6f67;
+          font-size: 13px;
+          font-weight: 600;
         }
 
         .value {
-          color: var(--color-text);
-          font-weight: 600;
-          text-align: right;
-          flex: 1;
+          color: #1f1a17;
+          font-size: 14px;
+          word-break: break-word;
         }
 
-        .divider {
+        .pricing .divider {
           height: 1px;
-          background: var(--color-border);
+          background: #eee4dc;
           margin: 4px 0;
         }
 
-        .pricing .info-row:last-child .value {
-          color: var(--color-primary);
-          font-size: 16px;
+        .info-row.total .label,
+        .info-row.total .value {
+          font-weight: 800;
+          color: #222;
+        }
+
+        .value select {
+          width: 100%;
+          min-height: 36px;
+          border-radius: 10px;
+          border: 1.5px solid var(--color-border);
+          padding: 6px 10px;
+          font-size: 14px;
+          background: #fff;
+        }
+
+        .terms-card {
+          grid-column: 1 / -1;
+          background: linear-gradient(180deg, #fff, #fef9f4);
         }
 
         .checkbox-group {
           display: flex;
+          gap: 10px;
           align-items: flex-start;
-          gap: 12px;
         }
 
-        input[type='checkbox'] {
-          width: 20px;
-          height: 20px;
+        .checkbox-group input {
           margin-top: 2px;
-          cursor: pointer;
-          accent-color: var(--color-primary);
-          flex-shrink: 0;
         }
 
-        label {
-          font-size: 13px;
-          color: var(--color-text);
-          cursor: pointer;
-          line-height: 1.5;
+        .checkbox-group label {
+          color: #473b33;
+          line-height: 1.45;
+          font-size: 14px;
         }
 
-        a {
-          color: var(--color-primary);
-          text-decoration: none;
-          font-weight: 600;
-        }
-
-        a:hover {
+        .checkbox-group a {
+          color: #c06b1e;
           text-decoration: underline;
         }
 
         .form-actions {
           display: grid;
           grid-template-columns: 1fr 1fr;
-          gap: 12px;
+          gap: 10px;
         }
 
-        button {
-          padding: 14px 24px;
-          border: none;
-          border-radius: 8px;
-          font-size: 14px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.2s;
+        .btn-primary, .btn-secondary {
+          min-height: 48px;
+          border-radius: 12px;
+          font-size: 16px;
+          font-weight: 700;
         }
 
-        .btn-primary {
-          background: var(--color-primary);
-          color: white;
-        }
-
-        .btn-primary:hover:not(:disabled) {
-          background: #d97023;
-          transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(225, 128, 45, 0.2);
-        }
-
-        .btn-primary:disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
-        }
-
-        .btn-secondary {
-          background: var(--color-bg-alt);
-          color: var(--color-text);
-          border: 1.5px solid var(--color-border);
-        }
-
-        .btn-secondary:hover {
-          background: var(--color-border);
-        }
-
-        @media (max-width: 640px) {
+        @media (max-width: 880px) {
+          .review-cards {
+            grid-template-columns: 1fr;
+          }
+          .info-row {
+            grid-template-columns: 1fr;
+            gap: 2px;
+          }
           .form-actions {
             grid-template-columns: 1fr;
           }

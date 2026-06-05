@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { RegistrationProvider } from '../../context/RegistrationContext'
 import Step1PersonalInfo from './Step1PersonalInfo'
@@ -26,10 +26,13 @@ export default function RegisterFlow() {
 
   const StepComponent = stepMap[step] || Step1PersonalInfo
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+  }, [step])
+
   return (
     <RegistrationProvider>
       <StepComponent />
     </RegistrationProvider>
   )
 }
-

@@ -78,7 +78,7 @@ export default function AdminRegistrations() {
         <div className="admin-kpi"><div className="n">{summary.pending}</div><div className="l">Pending</div></div>
       </div>
 
-      <div className="admin-filters" style={{ gridTemplateColumns: '1fr 1fr 1fr 1fr' }}>
+      <div className="admin-filters admin-filters-four">
         <select value={campaignId} onChange={(e) => setParam('campaignId', e.target.value)}>
           <option value="all">All Campaigns</option>
           {campaigns.map((c) => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
@@ -93,7 +93,7 @@ export default function AdminRegistrations() {
         <input type="date" value={from} onChange={(e) => setParam('from', e.target.value)} />
         <input type="date" value={to} onChange={(e) => setParam('to', e.target.value)} />
       </div>
-      <div className="admin-filters" style={{ gridTemplateColumns: '1fr 1fr' }}>
+      <div className="admin-filters admin-filters-two">
         <input type="date" value={date} onChange={(e) => setParam('date', e.target.value)} />
         <input value={q} onChange={(e) => setParam('q', e.target.value)} placeholder="Search name/email/mobile/ref/campaign" />
       </div>

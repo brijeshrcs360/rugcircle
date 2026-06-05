@@ -1,15 +1,44 @@
 ﻿import express from 'express'
+import fs from 'node:fs'
+import path from 'node:path'
+import multer from 'multer'
 import { pool } from '../lib/db.js'
-import { campaignCreateSchema, campaignStatusSchema } from '../lib/validators.js'
+import { campaignCreateSchema, campaignStatusSchema, productCreateSchema } from '../lib/validators.js'
 import { requireAdminSession } from '../middleware/requireAdminSession.js'
 
 const router = express.Router()
+
+
+const uploadsRoot = path.resolve(process.cwd(), 'server', 'uploads', 'products')
+fs.mkdirSync(uploadsRoot, { recursive: true })
+
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, uploadsRoot),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname || '').toLowerCase() || '.jpg'
+    cb(null, `${Date.now()}-${Math.random().toString(36).slice(2, 9)}${ext}`)
+  },
+})
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 8 * 1024 * 1024, files: 8 },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype?.startsWith('image/')) return cb(null, true)
+    cb(new Error('Only image files are allowed'))
+  },
+})
+
+const parseJsonArray = (value) => {
+  if (!value) return []
+  try { return JSON.parse(value) } catch { return [] }
+}
 
 router.use(requireAdminSession)
 
 router.get('/campaigns', async (_req, res) => {
   const [rows] = await pool.query(
-    `SELECT c.id, c.slug, c.name, c.location, c.city,
+    `SELECT c.id, c.slug, c.campaign_type AS campaignType, c.seasonal_label AS seasonalLabel, c.name, c.location, c.city,
             DATE_FORMAT(c.workshop_date, '%Y-%m-%d') AS workshopDate,
             DATE_FORMAT(c.start_time, '%H:%i') AS startTime,
             c.price_pp AS price,
@@ -32,7 +61,7 @@ router.get('/campaigns/:id', async (req, res) => {
   if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ ok: false, message: 'Invalid campaign id' })
 
   const [rows] = await pool.query(
-    `SELECT id, slug, name, location, city,
+    `SELECT id, slug, campaign_type AS campaignType, seasonal_label AS seasonalLabel, name, location, city,
             DATE_FORMAT(workshop_date, '%Y-%m-%d') AS workshopDate,
             DATE_FORMAT(start_time, '%H:%i') AS startTime,
             price_pp AS price,
@@ -55,7 +84,7 @@ router.get('/campaigns/:id/content', async (req, res) => {
   const [rows] = await pool.query(
     `SELECT campaign_id AS campaignId, short_subtitle, badge_text, price_unit_label, total_example,
             overview, whats_included, detail_features, itinerary, faq, terms_and_policy, gallery,
-            seo_title, seo_description
+            seo_title, seo_description, product_ids_json
      FROM campaign_content
      WHERE campaign_id = :id
      LIMIT 1`,
@@ -83,13 +112,14 @@ router.put('/campaigns/:id/content', async (req, res) => {
     gallery: JSON.stringify(req.body?.gallery || []),
     seoTitle: req.body?.seoTitle || null,
     seoDescription: req.body?.seoDescription || null,
+    productIdsJson: JSON.stringify(req.body?.productIds || []),
   }
 
   await pool.query(
     `INSERT INTO campaign_content
-      (campaign_id, short_subtitle, badge_text, price_unit_label, total_example, overview, whats_included, detail_features, itinerary, faq, terms_and_policy, gallery, seo_title, seo_description)
+      (campaign_id, short_subtitle, badge_text, price_unit_label, total_example, overview, whats_included, detail_features, itinerary, faq, terms_and_policy, gallery, seo_title, seo_description, product_ids_json)
      VALUES
-      (:id, :shortSubtitle, :badgeText, :priceUnitLabel, :totalExample, :overview, :whatsIncluded, :detailFeatures, :itinerary, :faq, :termsAndPolicy, :gallery, :seoTitle, :seoDescription)
+      (:id, :shortSubtitle, :badgeText, :priceUnitLabel, :totalExample, :overview, :whatsIncluded, :detailFeatures, :itinerary, :faq, :termsAndPolicy, :gallery, :seoTitle, :seoDescription, :productIdsJson)
      ON DUPLICATE KEY UPDATE
       short_subtitle = VALUES(short_subtitle),
       badge_text = VALUES(badge_text),
@@ -104,6 +134,7 @@ router.put('/campaigns/:id/content', async (req, res) => {
       gallery = VALUES(gallery),
       seo_title = VALUES(seo_title),
       seo_description = VALUES(seo_description),
+      product_ids_json = VALUES(product_ids_json),
       updated_at = CURRENT_TIMESTAMP`,
     { id, ...payload },
   )
@@ -123,11 +154,13 @@ router.post('/campaigns', async (req, res) => {
 
   const [result] = await pool.query(
     `INSERT INTO campaigns
-      (slug, name, location, city, workshop_date, start_time, price_pp, seat_capacity, status, created_by)
+      (slug, campaign_type, seasonal_label, name, location, city, workshop_date, start_time, price_pp, seat_capacity, status, created_by)
      VALUES
-      (:slug, :name, :location, :city, :workshopDate, :startTime, :price, :seatCapacity, :status, :createdBy)`,
+      (:slug, :campaignType, :seasonalLabel, :name, :location, :city, :workshopDate, :startTime, :price, :seatCapacity, :status, :createdBy)`,
     {
       slug,
+      campaignType: data.campaignType,
+      seasonalLabel: data.seasonalLabel || null,
       name: data.name,
       location: data.location,
       city: data.city || null,
@@ -153,6 +186,8 @@ router.put('/campaigns/:id', async (req, res) => {
   const data = parsed.data
   await pool.query(
     `UPDATE campaigns SET
+      campaign_type = :campaignType,
+      seasonal_label = :seasonalLabel,
       name = :name,
       location = :location,
       city = :city,
@@ -164,6 +199,8 @@ router.put('/campaigns/:id', async (req, res) => {
      WHERE id = :id`,
     {
       id,
+      campaignType: data.campaignType,
+      seasonalLabel: data.seasonalLabel || null,
       name: data.name,
       location: data.location,
       city: data.city || null,
@@ -196,6 +233,118 @@ router.delete('/campaigns/:id', async (req, res) => {
   const id = Number(req.params.id)
   if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ ok: false, message: 'Invalid campaign id' })
   await pool.query('DELETE FROM campaigns WHERE id = :id', { id })
+  res.json({ ok: true })
+})
+
+
+router.get('/products', async (_req, res) => {
+  const [rows] = await pool.query(
+    `SELECT id, title, price, description, main_image_url AS mainImageUrl, gallery_images_json AS galleryImagesJson,
+            created_at AS createdAt, updated_at AS updatedAt
+     FROM products
+     ORDER BY id DESC`,
+  )
+
+  const products = rows.map((row) => ({
+    ...row,
+    galleryImages: parseJsonArray(row.galleryImagesJson),
+  }))
+
+  res.json({ ok: true, products })
+})
+
+router.post('/products', upload.fields([{ name: 'mainImage', maxCount: 1 }, { name: 'galleryImages', maxCount: 7 }]), async (req, res) => {
+  const parsed = productCreateSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ ok: false, message: 'Invalid product payload' })
+
+  const main = req.files?.mainImage?.[0]
+  if (!main) return res.status(400).json({ ok: false, message: 'Main image is required' })
+
+  const gallery = Array.isArray(req.files?.galleryImages) ? req.files.galleryImages : []
+  const mainUrl = `/uploads/products/${main.filename}`
+  const galleryUrls = gallery.map((f) => `/uploads/products/${f.filename}`)
+
+  const data = parsed.data
+  const [result] = await pool.query(
+    `INSERT INTO products (title, price, description, main_image_url, gallery_images_json, created_by)
+     VALUES (:title, :price, :description, :mainImageUrl, :galleryImagesJson, :createdBy)`,
+    {
+      title: data.title,
+      price: data.price,
+      description: data.description || null,
+      mainImageUrl: mainUrl,
+      galleryImagesJson: JSON.stringify(galleryUrls),
+      createdBy: req.admin.userId,
+    },
+  )
+
+  res.status(201).json({ ok: true, id: result.insertId })
+})
+
+router.put('/products/:id', upload.fields([{ name: 'mainImage', maxCount: 1 }, { name: 'galleryImages', maxCount: 7 }]), async (req, res) => {
+  const id = Number(req.params.id)
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ ok: false, message: 'Invalid product id' })
+
+  const parsed = productCreateSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ ok: false, message: 'Invalid product payload' })
+
+  const [rows] = await pool.query('SELECT main_image_url AS mainImageUrl, gallery_images_json AS galleryImagesJson FROM products WHERE id=:id LIMIT 1', { id })
+  const current = rows[0]
+  if (!current) return res.status(404).json({ ok: false, message: 'Product not found' })
+
+  const newMain = req.files?.mainImage?.[0]
+  const newGallery = Array.isArray(req.files?.galleryImages) ? req.files.galleryImages : []
+
+  const nextMainUrl = newMain ? `/uploads/products/${newMain.filename}` : current.mainImageUrl
+  const nextGalleryUrls = newGallery.length > 0 ? newGallery.map((f) => `/uploads/products/${f.filename}`) : parseJsonArray(current.galleryImagesJson)
+  const data = parsed.data
+
+  await pool.query(
+    `UPDATE products
+     SET title=:title, price=:price, description=:description, main_image_url=:mainImageUrl, gallery_images_json=:galleryImagesJson
+     WHERE id=:id`,
+    {
+      id,
+      title: data.title,
+      price: data.price,
+      description: data.description || null,
+      mainImageUrl: nextMainUrl,
+      galleryImagesJson: JSON.stringify(nextGalleryUrls),
+    },
+  )
+
+  if (newMain && current.mainImageUrl) {
+    const oldMainAbs = path.resolve(process.cwd(), 'server', current.mainImageUrl.replace(/^\//, '').replaceAll('/', path.sep))
+    if (oldMainAbs.startsWith(path.resolve(process.cwd(), 'server', 'uploads'))) fs.promises.unlink(oldMainAbs).catch(() => {})
+  }
+  if (newGallery.length > 0) {
+    for (const rel of parseJsonArray(current.galleryImagesJson)) {
+      const abs = path.resolve(process.cwd(), 'server', String(rel || '').replace(/^\//, '').replaceAll('/', path.sep))
+      if (abs.startsWith(path.resolve(process.cwd(), 'server', 'uploads'))) fs.promises.unlink(abs).catch(() => {})
+    }
+  }
+
+  res.json({ ok: true })
+})
+
+router.delete('/products/:id', async (req, res) => {
+  const id = Number(req.params.id)
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ ok: false, message: 'Invalid product id' })
+
+  const [rows] = await pool.query('SELECT main_image_url AS mainImageUrl, gallery_images_json AS galleryImagesJson FROM products WHERE id=:id LIMIT 1', { id })
+  if (!rows[0]) return res.status(404).json({ ok: false, message: 'Product not found' })
+
+  await pool.query('DELETE FROM products WHERE id = :id', { id })
+
+  const paths = [rows[0].mainImageUrl, ...parseJsonArray(rows[0].galleryImagesJson)]
+  for (const rel of paths) {
+    if (!rel) continue
+    const abs = path.resolve(process.cwd(), 'server', rel.replace(/^\//, '').replaceAll('/', path.sep))
+    if (abs.startsWith(path.resolve(process.cwd(), 'server', 'uploads'))) {
+      fs.promises.unlink(abs).catch(() => {})
+    }
+  }
+
   res.json({ ok: true })
 })
 
