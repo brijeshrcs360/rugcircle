@@ -12,6 +12,7 @@ import { pool } from './lib/db.js'
 import { errorHandler } from './middleware/errorHandler.js'
 
 const app = express()
+app.set('trust proxy', 1)
 
 app.use(helmet({
   crossOriginResourcePolicy: false,

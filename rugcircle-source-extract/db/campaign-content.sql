@@ -1,0 +1,22 @@
+CREATE TABLE IF NOT EXISTS campaign_content (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  campaign_id BIGINT UNSIGNED NOT NULL,
+  short_subtitle VARCHAR(220) NULL,
+  badge_text VARCHAR(80) NULL,
+  price_unit_label VARCHAR(40) NULL DEFAULT '/ person',
+  total_example VARCHAR(220) NULL,
+  overview LONGTEXT NULL,
+  whats_included JSON NULL,
+  detail_features JSON NULL,
+  itinerary JSON NULL,
+  faq JSON NULL,
+  terms_and_policy LONGTEXT NULL,
+  gallery JSON NULL,
+  seo_title VARCHAR(190) NULL,
+  seo_description VARCHAR(300) NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_campaign_content_campaign (campaign_id),
+  CONSTRAINT fk_campaign_content_campaign FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
