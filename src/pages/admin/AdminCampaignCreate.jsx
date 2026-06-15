@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../../services/api'
+import useSEO from '../../hooks/useSEO'
 
 const CAMPAIGN_TYPE_OPTIONS = [
   { value: 'city_workshop', label: 'Workshop in City' },
@@ -19,9 +20,20 @@ function Field({ label, children }) {
 }
 
 export default function AdminCampaignCreate() {
+  useSEO({
+    title: 'Create Campaign',
+    description: 'Create a new Rug Circle campaign and select products before opening the editor.',
+    canonical: '/admin/campaigns/new',
+    robots: 'noindex, nofollow',
+  })
+
   const navigate = useNavigate()
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+  const [loadingProducts, setLoadingProducts] = useState(true)
+  const [products, setProducts] = useState([])
+  const [selectedProductIds, setSelectedProductIds] = useState([])
+  const [productSearch, setProductSearch] = useState('')
   const [newCampaign, setNewCampaign] = useState({
     campaignType: 'city_workshop',
     seasonalLabel: '',
@@ -33,7 +45,38 @@ export default function AdminCampaignCreate() {
     price: '',
     seatCapacity: '',
     status: 'draft',
+    seoTitle: '',
+    seoDescription: '',
   })
+
+  useEffect(() => {
+    api.listProducts()
+      .then((res) => setProducts(res.products || []))
+      .catch((err) => console.error('Failed fetching products:', err))
+      .finally(() => setLoadingProducts(false))
+  }, [])
+
+  const addProduct = (pid) => {
+    const idNum = Number(pid)
+    if (!Number.isInteger(idNum) || idNum <= 0) return
+    setSelectedProductIds((s) => s.includes(idNum) ? s : [...s, idNum])
+  }
+
+  const removeProduct = (pid) => {
+    const idNum = Number(pid)
+    setSelectedProductIds((s) => s.filter((x) => x !== idNum))
+  }
+
+  const filteredProducts = products.filter((p) => {
+    const q = productSearch.trim().toLowerCase()
+    if (!q) return true
+    const title = String(p?.title || '').toLowerCase()
+    const price = String(Number(p?.price || 0).toLocaleString('en-IN')).toLowerCase()
+    return title.includes(q) || price.includes(q)
+  })
+
+  const selectedProducts = products.filter((p) => selectedProductIds.includes(Number(p.id)))
+
 
   const addCampaign = async (e) => {
     e.preventDefault()
@@ -44,6 +87,9 @@ export default function AdminCampaignCreate() {
         ...newCampaign,
         price: Number(newCampaign.price),
         seatCapacity: Number(newCampaign.seatCapacity),
+        productIds: selectedProductIds,
+        seoTitle: newCampaign.seoTitle,
+        seoDescription: newCampaign.seoDescription,
       }
       const res = await api.createCampaign(payload)
       setNewCampaign({
@@ -57,7 +103,11 @@ export default function AdminCampaignCreate() {
         price: '',
         seatCapacity: '',
         status: 'draft',
+        seoTitle: '',
+        seoDescription: '',
       })
+      setSelectedProductIds([])
+      setProductSearch('')
       if (res?.id) navigate(`/admin/campaign/${res.id}`)
     } catch (e2) {
       setError(e2.message || 'Failed creating campaign')
@@ -123,6 +173,95 @@ export default function AdminCampaignCreate() {
             <option value="active">Active</option>
             <option value="closed">Closed</option>
           </select>
+        </Field>
+
+        <Field label="SEO Title">
+          <input
+            placeholder="Meta title for search results"
+            value={newCampaign.seoTitle}
+            onChange={(e) => setNewCampaign((s) => ({ ...s, seoTitle: e.target.value }))}
+          />
+        </Field>
+
+        <Field label="SEO Description">
+          <textarea
+            placeholder="Meta description for search engines"
+            value={newCampaign.seoDescription}
+            onChange={(e) => setNewCampaign((s) => ({ ...s, seoDescription: e.target.value }))}
+            style={{ minHeight: 90, border: '1.5px solid var(--color-border)', borderRadius: 10, padding: '10px 12px' }}
+          />
+        </Field>
+
+        <Field label="Products (Search + Select)">
+          <input
+            placeholder="Search product by name or price..."
+            value={productSearch}
+            onChange={(e) => setProductSearch(e.target.value)}
+          />
+          <div style={{ marginTop: 8, border: '1.5px solid var(--color-border)', borderRadius: 12, maxHeight: 220, overflow: 'auto', background: '#fff' }}>
+            {loadingProducts && <div style={{ padding: 10, fontSize: 12, color: '#888' }}>Loading products...</div>}
+            {!loadingProducts && filteredProducts.map((p) => {
+              const picked = selectedProductIds.includes(Number(p.id))
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => (picked ? removeProduct(p.id) : addProduct(p.id))}
+                  style={{
+                    width: '100%',
+                    textAlign: 'left',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '10px 12px',
+                    border: 'none',
+                    borderBottom: '1px solid #f0f0f0',
+                    background: picked ? 'rgba(225, 128, 45, 0.12)' : '#fff',
+                    cursor: 'pointer',
+                    fontSize: 14,
+                    color: '#2a2a2a',
+                  }}
+                >
+                  <span style={{ fontWeight: 600 }}>{p.title}</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 12, color: '#7b6c61' }}>INR {Number(p.price || 0).toLocaleString('en-IN')}</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: picked ? '#b65d0b' : '#999' }}>{picked ? 'Selected' : 'Add'}</span>
+                  </span>
+                </button>
+              )
+            })}
+            {!loadingProducts && filteredProducts.length === 0 && <div style={{ padding: 10, fontSize: 12, color: '#888' }}>No products found</div>}
+          </div>
+          <div style={{ marginTop: 10, border: '1px dashed #ebd8c7', borderRadius: 12, padding: 10, background: '#fffaf4' }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#8c6748', marginBottom: 8 }}>
+              Selected Products ({selectedProducts.length})
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {selectedProducts.map((p) => (
+                <button
+                  key={`selected-${p.id}`}
+                  type="button"
+                  onClick={() => removeProduct(p.id)}
+                  style={{
+                    border: '1px solid #e6b88a',
+                    borderRadius: 999,
+                    padding: '6px 10px',
+                    background: '#fff',
+                    fontSize: 12,
+                    cursor: 'pointer',
+                    color: '#6b4d34',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}
+                >
+                  <span>{p.title}</span>
+                  <span style={{ opacity: 0.8 }}>x</span>
+                </button>
+              ))}
+              {selectedProducts.length === 0 && <span style={{ fontSize: 12, color: '#888' }}>No products selected</span>}
+            </div>
+          </div>
         </Field>
 
         <button type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save Campaign'}</button>

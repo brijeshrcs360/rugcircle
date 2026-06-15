@@ -1,10 +1,11 @@
-﻿import express from 'express'
+import express from 'express'
 import fs from 'node:fs'
 import path from 'node:path'
 import multer from 'multer'
 import { pool } from '../lib/db.js'
-import { campaignCreateSchema, campaignStatusSchema, productCreateSchema } from '../lib/validators.js'
+import { campaignCreateSchema, campaignStatusSchema, productCreateSchema, couponCreateSchema } from '../lib/validators.js'
 import { requireAdminSession } from '../middleware/requireAdminSession.js'
+import { listLeads, updateLeadStatus } from '../services/leadService.js'
 
 const router = express.Router()
 
@@ -173,7 +174,19 @@ router.post('/campaigns', async (req, res) => {
     },
   )
 
-  res.status(201).json({ ok: true, id: result.insertId })
+  const campaignId = result.insertId
+  const productIds = data.productIds || []
+  await pool.query(
+    `INSERT INTO campaign_content (campaign_id, seo_title, seo_description, product_ids_json) VALUES (:campaignId, :seoTitle, :seoDescription, :productIdsJson)`,
+    {
+      campaignId,
+      seoTitle: data.seoTitle || null,
+      seoDescription: data.seoDescription || null,
+      productIdsJson: JSON.stringify(productIds),
+    },
+  )
+
+  res.status(201).json({ ok: true, id: campaignId })
 })
 
 router.put('/campaigns/:id', async (req, res) => {
@@ -234,6 +247,60 @@ router.delete('/campaigns/:id', async (req, res) => {
   if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ ok: false, message: 'Invalid campaign id' })
   await pool.query('DELETE FROM campaigns WHERE id = :id', { id })
   res.json({ ok: true })
+})
+
+router.post('/campaigns/:id/duplicate', async (req, res) => {
+  const id = Number(req.params.id)
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ ok: false, message: 'Invalid campaign id' })
+  const [rows] = await pool.query(
+    `SELECT * FROM campaigns c LEFT JOIN campaign_content cc ON cc.campaign_id = c.id WHERE c.id = :id LIMIT 1`,
+    { id },
+  )
+  const src = rows[0]
+  if (!src) return res.status(404).json({ ok: false, message: 'Campaign not found' })
+  const slug = `${String(src.name || 'campaign')}-${Date.now()}`.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+  const [result] = await pool.query(
+    `INSERT INTO campaigns (slug, campaign_type, seasonal_label, name, location, city, workshop_date, start_time, price_pp, seat_capacity, status, created_by)
+     VALUES (:slug, :campaignType, :seasonalLabel, :name, :location, :city, :workshopDate, :startTime, :price, :seatCapacity, 'draft', :createdBy)`,
+    {
+      slug,
+      campaignType: src.campaign_type,
+      seasonalLabel: src.seasonal_label,
+      name: `${src.name} Copy`,
+      location: src.location,
+      city: src.city,
+      workshopDate: src.workshop_date,
+      startTime: src.start_time,
+      price: src.price_pp,
+      seatCapacity: src.seat_capacity,
+      createdBy: req.admin.userId,
+    },
+  )
+  const campaignId = result.insertId
+  if (src.short_subtitle || src.overview || src.seo_title || src.product_ids_json) {
+    await pool.query(
+      `INSERT INTO campaign_content (campaign_id, short_subtitle, badge_text, price_unit_label, total_example, overview, whats_included, detail_features, itinerary, faq, terms_and_policy, gallery, seo_title, seo_description, product_ids_json)
+       VALUES (:campaignId, :shortSubtitle, :badgeText, :priceUnitLabel, :totalExample, :overview, :whatsIncluded, :detailFeatures, :itinerary, :faq, :termsAndPolicy, :gallery, :seoTitle, :seoDescription, :productIdsJson)`,
+      {
+        campaignId,
+        shortSubtitle: src.short_subtitle || null,
+        badgeText: src.badge_text || null,
+        priceUnitLabel: src.price_unit_label || '/ person',
+        totalExample: src.total_example || null,
+        overview: src.overview || null,
+        whatsIncluded: src.whats_included || null,
+        detailFeatures: src.detail_features || null,
+        itinerary: src.itinerary || null,
+        faq: src.faq || null,
+        termsAndPolicy: src.terms_and_policy || null,
+        gallery: src.gallery || null,
+        seoTitle: src.seo_title || null,
+        seoDescription: src.seo_description || null,
+        productIdsJson: src.product_ids_json || null,
+      },
+    )
+  }
+  res.status(201).json({ ok: true, id: campaignId })
 })
 
 
@@ -348,6 +415,91 @@ router.delete('/products/:id', async (req, res) => {
   res.json({ ok: true })
 })
 
+router.get('/analytics/summary', async (_req, res) => {
+  const [[campaigns]] = await pool.query('SELECT COUNT(*) AS total, SUM(status = "active") AS active, SUM(status = "draft") AS draft, SUM(status = "closed") AS closed FROM campaigns')
+  const [[products]] = await pool.query('SELECT COUNT(*) AS total FROM products')
+  const [[registrations]] = await pool.query('SELECT COUNT(*) AS total, SUM(payment_status = "paid") AS paid, SUM(payment_status = "pending") AS pending FROM registrations')
+  const [[coupons]] = await pool.query('SELECT COUNT(*) AS total, SUM(status = "active") AS active FROM coupons')
+  res.json({ ok: true, summary: { campaigns, products, registrations, coupons } })
+})
+
+router.get('/campaign-calendar', async (_req, res) => {
+  const [rows] = await pool.query(
+    `SELECT id, name, slug, workshop_date AS workshopDate, start_time AS startTime, status, seat_capacity AS seatCapacity
+     FROM campaigns
+     ORDER BY workshop_date ASC, start_time ASC`,
+  )
+  res.json({ ok: true, campaigns: rows })
+})
+
+router.get('/export/campaigns', async (_req, res) => {
+  const [rows] = await pool.query('SELECT * FROM campaigns ORDER BY id DESC')
+  res.json({ ok: true, campaigns: rows })
+})
+
+router.get('/export/products', async (_req, res) => {
+  const [rows] = await pool.query('SELECT * FROM products ORDER BY id DESC')
+  res.json({ ok: true, products: rows })
+})
+
+router.post('/import/products', async (req, res) => {
+  const products = Array.isArray(req.body?.products) ? req.body.products : []
+  let inserted = 0
+  for (const item of products) {
+    if (!item?.title || !Number(item?.price)) continue
+    await pool.query(
+      `INSERT INTO products (title, price, description, main_image_url, gallery_images_json, created_by)
+       VALUES (:title, :price, :description, :mainImageUrl, :galleryImagesJson, :createdBy)`,
+      {
+        title: String(item.title),
+        price: Number(item.price),
+        description: item.description || null,
+        mainImageUrl: item.mainImageUrl || null,
+        galleryImagesJson: JSON.stringify(Array.isArray(item.galleryImages) ? item.galleryImages : []),
+        createdBy: req.admin.userId,
+      },
+    )
+    inserted += 1
+  }
+  res.json({ ok: true, inserted })
+})
+
+router.get('/coupons', async (_req, res) => {
+  const [rows] = await pool.query('SELECT * FROM coupons ORDER BY id DESC')
+  res.json({ ok: true, coupons: rows })
+})
+
+router.post('/coupons', async (req, res) => {
+  const parsed = couponCreateSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ ok: false, message: 'Invalid coupon payload' })
+  const data = parsed.data
+  const code = String(data.code).trim().toUpperCase()
+  const [result] = await pool.query(
+    `INSERT INTO coupons (code, discount_type, discount_value, min_amount, max_discount, usage_limit, status, start_date, end_date, created_by)
+     VALUES (:code, :discountType, :discountValue, :minAmount, :maxDiscount, :usageLimit, :status, :startDate, :endDate, :createdBy)`,
+    {
+      code,
+      discountType: data.discountType,
+      discountValue: data.discountValue,
+      minAmount: data.minAmount,
+      maxDiscount: data.maxDiscount,
+      usageLimit: data.usageLimit,
+      status: data.status,
+      startDate: data.startDate || null,
+      endDate: data.endDate || null,
+      createdBy: req.admin.userId,
+    },
+  )
+  res.status(201).json({ ok: true, id: result.insertId })
+})
+
+router.delete('/coupons/:id', async (req, res) => {
+  const id = Number(req.params.id)
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ ok: false, message: 'Invalid coupon id' })
+  await pool.query('DELETE FROM coupons WHERE id = :id', { id })
+  res.json({ ok: true })
+})
+
 router.get('/registrations', async (req, res) => {
   const campaignId = Number(req.query.campaignId || 0)
   const paymentStatus = String(req.query.paymentStatus || '').trim().toLowerCase()
@@ -441,6 +593,20 @@ router.get('/registrations/:id', async (req, res) => {
   )
 
   res.json({ ok: true, registration: rows[0], paymentEvents: events })
+})
+
+router.get('/leads', async (_req, res) => {
+  const leads = await listLeads()
+  res.json({ ok: true, leads })
+})
+
+router.patch('/leads/:id/status', async (req, res) => {
+  const id = Number(req.params.id)
+  const status = String(req.body?.status || '').trim()
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ ok: false, message: 'Invalid lead id' })
+  if (!['new', 'contacted', 'qualified', 'won', 'lost'].includes(status)) return res.status(400).json({ ok: false, message: 'Invalid status' })
+  await updateLeadStatus(id, status)
+  res.json({ ok: true })
 })
 
 export default router

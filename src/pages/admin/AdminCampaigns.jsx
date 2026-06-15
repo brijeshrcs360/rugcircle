@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../services/api'
+import useSEO from '../../hooks/useSEO'
 
 function nextStatus(current) {
   if (current === 'draft') return 'active'
@@ -16,6 +17,13 @@ const CAMPAIGN_TYPE_OPTIONS = [
 ]
 
 export default function AdminCampaigns() {
+  useSEO({
+    title: 'Admin Campaigns',
+    description: 'Create, edit, and manage Rug Circle campaigns from the admin panel.',
+    canonical: '/admin/campaigns',
+    robots: 'noindex, nofollow',
+  })
+
   const [campaigns, setCampaigns] = useState([])
   const [error, setError] = useState('')
 
@@ -30,6 +38,11 @@ export default function AdminCampaigns() {
 
   const toggleStatus = async (id, currentStatus) => {
     await api.updateCampaignStatus(id, nextStatus(currentStatus))
+    await fetchCampaigns()
+  }
+
+  const duplicateCampaign = async (id) => {
+    await api.duplicateCampaign(id)
     await fetchCampaigns()
   }
 
@@ -65,6 +78,7 @@ export default function AdminCampaigns() {
                 <td>
                   <div style={{ display: 'flex', gap: 6 }}>
                     <Link className="admin-link-btn" to={`/admin/registrations?campaignId=${c.id}`}>Registrations</Link>
+                    <button onClick={() => duplicateCampaign(c.id)}>Duplicate</button>
                     <button onClick={() => toggleStatus(c.id, c.status)}>Cycle</button>
                   </div>
                 </td>

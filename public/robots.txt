@@ -1,0 +1,13 @@
+# Rug Circle — robots.txt
+# Allow crawling of all public pages
+# Block admin panel and user dashboard
+
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /admin/
+Disallow: /user
+Disallow: /user/
+
+# Sitemap
+Sitemap: https://rugcircle.com/sitemap.xml

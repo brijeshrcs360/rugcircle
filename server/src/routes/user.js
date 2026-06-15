@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs'
 import { getUserCookieConfig } from '../services/userService.js'
 import {
   createBookingHandler,
+  leadHandler,
   loginHandler,
   paymentWebhookHandler,
   requestOtpHandler,
@@ -17,6 +18,7 @@ router.post('/bookings', createBookingHandler)
 router.post('/login', loginHandler)
 router.post('/request-otp', requestOtpHandler)
 router.post('/payment/webhook', paymentWebhookHandler)
+router.post('/lead', leadHandler)
 
 router.post('/logout', requireUser, async (req, res) => {
   const { cookieCfg } = getUserCookieConfig()

@@ -62,6 +62,10 @@ export const RegistrationProvider = ({ children }) => {
     })
   }
 
+  const updateCoupon = (coupon) => {
+    updateRegistration({ coupon })
+  }
+
   const startPayment = async (campaignSlug, amount) => {
     setLoading(true)
     try {
@@ -106,6 +110,7 @@ export const RegistrationProvider = ({ children }) => {
     updateContactInfo,
     updateSelectedDesign,
     updatePaymentInfo,
+    updateCoupon,
     startPayment,
     setPaymentStatus,
     setErrors,
@@ -141,6 +146,7 @@ function getInitialRegistration() {
     payment_percent: 50,
     payment_amount: 0,
     payment_status: 'draft',
+    coupon: null,
     registration_code: null,
     hdfc_reference_id: null,
     created_at: new Date().toISOString(),

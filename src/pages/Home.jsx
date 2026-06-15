@@ -9,8 +9,16 @@ import HowItWorks   from '../components/sections/HowItWorks'
 import Testimonial  from '../components/sections/Testimonial'
 import FAQ          from '../components/sections/FAQ'
 import ContactForm  from '../components/sections/ContactForm'
+import useSEO from '../hooks/useSEO'
 
 export default function Home() {
+  useSEO({
+    title: 'Corporate Rug Tufting Workshops in India',
+    description: 'Book premium rug tufting workshops for corporate teams. Hands-on experiences, custom rugs, and memorable team building across India.',
+    keywords: 'corporate rug tufting, team building workshop, rug workshop India, corporate experiences, handmade rug workshop',
+    canonical: '/',
+  })
+
   return (
     <>
       <div className="marquee-bar">

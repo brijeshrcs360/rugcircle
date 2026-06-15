@@ -31,6 +31,8 @@ export default function Step5Payment() {
   const total = subtotal + gst
   const paymentPercent = Number(registration?.payment_percent || 100)
   const amount = paymentPercent === 50 ? Math.round(total * 0.5) : total
+  const couponDiscount = Number(registration?.coupon?.discount || 0)
+  const finalAmount = Math.max(0, amount - couponDiscount)
 
   const createUserBookingAndRedirect = useCallback(async (fallbackId) => {
     setBookingBusy(true)
@@ -64,14 +66,14 @@ export default function Step5Payment() {
 
   const initPayment = useCallback(async () => {
     try {
-      if (!amount || amount <= 0) { setLoadingQR(false); return }
-      const regCode = await startPayment(slug, amount)
-      const qr = await generatePaymentQR(amount, regCode)
+      if (!finalAmount || finalAmount <= 0) { setLoadingQR(false); return }
+      const regCode = await startPayment(slug, finalAmount)
+      const qr = await generatePaymentQR(finalAmount, regCode)
       setQrData(qr)
     } finally {
       setLoadingQR(false)
     }
-  }, [amount, slug, startPayment])
+  }, [finalAmount, slug, startPayment])
 
   useEffect(() => { initPayment() }, [initPayment])
   useEffect(() => {
@@ -132,8 +134,8 @@ export default function Step5Payment() {
   const formatTime = (seconds) => `${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, '0')}`
   const formatCurrency = (n) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(n)
   if (loadingQR) return <RegistrationLayout currentStep={5} onBack={handleBack} title="Complete Payment"><div className="loading-container"><div className="spinner" /><p>Generating UPI QR Code...</p></div></RegistrationLayout>
-  if (campaignError || !amount || !qrData) return <RegistrationLayout currentStep={5} onBack={handleBack} title="Complete Payment"><div className="error-container"><AlertCircle size={48} /><p>{campaignError || 'Failed to generate QR code.'}</p></div></RegistrationLayout>
+  if (campaignError || !finalAmount || !qrData) return <RegistrationLayout currentStep={5} onBack={handleBack} title="Complete Payment"><div className="error-container"><AlertCircle size={48} /><p>{campaignError || 'Failed to generate QR code.'}</p></div></RegistrationLayout>
   if (paymentStatus === 'expired') return <RegistrationLayout currentStep={5} onBack={handleBack} title="Complete Payment"><div className="error-container"><Clock size={48} /><p>This QR code expired. Please go back and generate a new one.</p><button type="button" className="btn-primary" onClick={handleBack}>Go Back</button></div></RegistrationLayout>
 
-  return <RegistrationLayout currentStep={5} onBack={handleBack} title="Complete Payment"><div className="payment-container"><motion.div className="payment-card" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}><div className="payment-header"><h2>Scan to Pay</h2><p className="amount">{formatCurrency(amount)}</p>{paymentStatus === 'waiting' && <div className="timer"><Clock size={16} /><span>Expires in {formatTime(timeRemaining)}</span></div>}</div>{paymentStatus === 'waiting' && <div className="qr-section"><img src={qrData.qr_code} alt="Payment QR Code" className="qr-code" /><a href={qrData.upi_string} className="upi-link">Pay via Direct UPI Link</a><div className="step5-actions"><button type="button" className="btn-primary" disabled={bookingBusy} onClick={onClickSuccess}>{bookingBusy ? 'Creating User...' : 'Success'}</button><button type="button" onClick={onClickFail} className="step5-ghost-btn">Fail</button></div></div>}{paymentStatus === 'waiting' && <div className="status-section"><div className="polling-status"><Loader size={20} className="spinner-icon" /><p>Waiting for payment confirmation...</p><span className="polling-count">Checking... ({pollingCount})</span></div></div>}{paymentStatus === 'paid' && <motion.div className="status-section success" initial={{ scale: 0.8 }} animate={{ scale: 1 }}><CheckCircle2 size={48} className="success-icon" /><h3>Payment Successful</h3></motion.div>}{paymentStatus === 'failed' && <div className="status-section error"><AlertCircle size={48} className="error-icon" /><h3>Payment Failed</h3><p>{paymentError || 'User not created. Please contact us.'}</p><div className="step5-fail-actions"><a href={`https://wa.me/${supportWa}?text=Need%20help%20for%20failed%20payment`} target="_blank" rel="noreferrer" className="btn-primary" style={{ textAlign: 'center' }}>Contact Us</a><button type="button" onClick={() => navigate('/')} className="step5-ghost-btn">Back to Home</button></div></div>}</motion.div></div></RegistrationLayout>
+  return <RegistrationLayout currentStep={5} onBack={handleBack} title="Complete Payment"><div className="payment-container"><motion.div className="payment-card" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}><div className="payment-header"><h2>Scan to Pay</h2><p className="amount">{formatCurrency(finalAmount)}</p>{couponDiscount > 0 && <p style={{ fontSize: 13, color: '#2f7d32', fontWeight: 700 }}>Coupon applied: -{formatCurrency(couponDiscount)}</p>}{paymentStatus === 'waiting' && <div className="timer"><Clock size={16} /><span>Expires in {formatTime(timeRemaining)}</span></div>}</div>{paymentStatus === 'waiting' && <div className="qr-section"><img src={qrData.qr_code} alt="Payment QR Code" className="qr-code" /><a href={qrData.upi_string} className="upi-link">Pay via Direct UPI Link</a><div className="step5-actions"><button type="button" className="btn-primary" disabled={bookingBusy} onClick={onClickSuccess}>{bookingBusy ? 'Creating User...' : 'Success'}</button><button type="button" onClick={onClickFail} className="step5-ghost-btn">Fail</button></div></div>}{paymentStatus === 'waiting' && <div className="status-section"><div className="polling-status"><Loader size={20} className="spinner-icon" /><p>Waiting for payment confirmation...</p><span className="polling-count">Checking... ({pollingCount})</span></div></div>}{paymentStatus === 'paid' && <motion.div className="status-section success" initial={{ scale: 0.8 }} animate={{ scale: 1 }}><CheckCircle2 size={48} className="success-icon" /><h3>Payment Successful</h3></motion.div>}{paymentStatus === 'failed' && <div className="status-section error"><AlertCircle size={48} className="error-icon" /><h3>Payment Failed</h3><p>{paymentError || 'User not created. Please contact us.'}</p><div className="step5-fail-actions"><a href={`https://wa.me/${supportWa}?text=Need%20help%20for%20failed%20payment`} target="_blank" rel="noreferrer" className="btn-primary" style={{ textAlign: 'center' }}>Contact Us</a><button type="button" onClick={() => navigate('/')} className="step5-ghost-btn">Back to Home</button></div></div>}</motion.div></div></RegistrationLayout>
 }

@@ -6,6 +6,7 @@ import Step2ContactInfo from './Step2ContactInfo'
 import Step3DesignSelection from './Step3DesignSelection'
 import Step4ReviewConfirm from './Step4ReviewConfirm'
 import Step5Payment from './Step5Payment'
+import useSEO from '../../hooks/useSEO'
 
 const stepMap = {
   1: Step1PersonalInfo,
@@ -29,6 +30,13 @@ export default function RegisterFlow() {
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
   }, [step])
+
+  useSEO({
+    title: `Register for Workshop - Step ${step}`,
+    description: 'Complete your Rug Circle workshop registration in a guided multi-step flow.',
+    canonical: '/register',
+    robots: 'noindex, nofollow',
+  })
 
   return (
     <RegistrationProvider>

@@ -3,6 +3,7 @@ import { sha256 } from '../lib/crypto.js'
 import { config } from '../config/env.js'
 import { bookingCreateSchema, userLoginSchema } from '../lib/validators.js'
 import { createBooking, getUserCookieConfig, loginUser, requestOtp, requireUserFromCookie, touchUserSession } from '../services/userService.js'
+import { createLead } from '../services/leadService.js'
 
 function errRes(res, err) { return res.status(err?.status || 500).json({ ok: false, message: err?.message || 'Request failed' }) }
 
@@ -53,4 +54,12 @@ export async function paymentWebhookHandler(req, res) {
     evt: 'webhook_update', provider: 'hdfc_vyapar', providerEventId: txnId, st: paymentStatus, payload: raw, code,
   })
   return res.json({ ok: true })
+}
+
+export async function leadHandler(req, res) {
+  try {
+    return res.status(201).json(await createLead(req.body || {}))
+  } catch (err) {
+    return errRes(res, err)
+  }
 }

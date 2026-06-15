@@ -2,11 +2,19 @@ import { useLocation, Link } from 'react-router-dom'
 import { motion } from 'motion/react'
 import { useEffect } from 'react'
 import { formatCurrency } from '../utils/format'
+import useSEO from '../hooks/useSEO'
 
 export default function Success() {
   const { state } = useLocation()
 
   useEffect(() => { window.scrollTo(0, 0) }, [])
+
+  useSEO({
+    title: 'Booking Confirmed',
+    description: 'Your Rug Circle booking is confirmed. Next steps, payment details, and follow-up information.',
+    canonical: '/success',
+    robots: 'noindex, nofollow',
+  })
 
   return (
     <div className="success-page">

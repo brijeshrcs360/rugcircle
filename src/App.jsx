@@ -3,6 +3,7 @@ import Navbar from './components/layout/Navbar'
 import Footer from './components/layout/Footer'
 import Home from './pages/Home'
 import PackageDetails from './pages/PackageDetails'
+import ProductDetails from './pages/ProductDetails'
 import Payment from './pages/Payment'
 import Success from './pages/Success'
 import AdminLogin from './pages/AdminLogin'
@@ -12,6 +13,7 @@ import AdminLayout from './components/admin/AdminLayout'
 import AdminOverview from './pages/admin/AdminOverview'
 import AdminCampaigns from './pages/admin/AdminCampaigns'
 import AdminCampaignCreate from './pages/admin/AdminCampaignCreate'
+import AdminLeads from './pages/admin/AdminLeads'
 import AdminRegistrations from './pages/admin/AdminRegistrations'
 import AdminRegistrationDetails from './pages/admin/AdminRegistrationDetails'
 import AdminProducts from './pages/admin/AdminProducts'
@@ -37,6 +39,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/package/:slug" element={<PackageDetails />} />
+        <Route path="/product/:id" element={<ProductDetails />} />
         <Route path="/payment/:slug" element={<Payment />} />
         <Route path="/success" element={<Success />} />
         <Route path="/register/:slug" element={<RegisterFlow />} />
@@ -59,6 +62,7 @@ function App() {
           <Route path="campaigns" element={<AdminCampaigns />} />
           <Route path="campaigns/new" element={<AdminCampaignCreate />} />
           <Route path="products" element={<AdminProducts />} />
+          <Route path="leads" element={<AdminLeads />} />
           <Route path="registrations" element={<AdminRegistrations />} />
           <Route path="registrations/:id" element={<AdminRegistrationDetails />} />
           <Route path="campaign/:id" element={<AdminCampaignEditor />} />

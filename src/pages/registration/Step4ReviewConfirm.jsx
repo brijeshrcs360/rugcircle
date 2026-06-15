@@ -3,12 +3,16 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useRegistration } from '../../context/RegistrationContext'
 import RegistrationLayout from '../../components/registration/RegistrationLayout'
 import { AlertCircle, CheckCircle2 } from 'lucide-react'
+import { api } from '../../services/api'
 
 export default function Step4ReviewConfirm() {
   const { slug } = useParams()
   const navigate = useNavigate()
-  const { registration, updateStep, updatePaymentInfo } = useRegistration()
+  const { registration, updateStep, updatePaymentInfo, updateCoupon } = useRegistration()
   const [termsAccepted, setTermsAccepted] = useState(false)
+  const [couponCode, setCouponCode] = useState(registration.coupon?.code || '')
+  const [couponMessage, setCouponMessage] = useState('')
+  const [couponLoading, setCouponLoading] = useState(false)
 
   const campaignPrice = 5500
   const quantity = 1
@@ -17,6 +21,25 @@ export default function Step4ReviewConfirm() {
   const total = subtotal + gst
   const paymentPercent = Number(registration.payment_percent || 50)
   const payableNow = paymentPercent === 50 ? Math.round(total * 0.5) : total
+  const couponDiscount = Number(registration.coupon?.discount || 0)
+  const finalPayableNow = Math.max(0, payableNow - couponDiscount)
+
+  const applyCoupon = async () => {
+    const code = couponCode.trim()
+    if (!code) return
+    setCouponLoading(true)
+    setCouponMessage('')
+    try {
+      const res = await api.validateCoupon(code, payableNow)
+      updateCoupon(res.coupon)
+      setCouponMessage(`Applied ${res.coupon.code}. Discount Rs ${Number(res.coupon.discount || 0).toLocaleString()}`)
+    } catch (e) {
+      updateCoupon(null)
+      setCouponMessage(e.message || 'Coupon invalid')
+    } finally {
+      setCouponLoading(false)
+    }
+  }
 
   const handleNext = () => {
     if (!termsAccepted) return
@@ -76,6 +99,17 @@ export default function Step4ReviewConfirm() {
                 </span>
               </div>
               <div className="info-row total"><span className="label">Payable Now</span><span className="value">Rs {payableNow.toLocaleString()}</span></div>
+              <div className="info-row">
+                <span className="label">Coupon</span>
+                <span className="value">
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input value={couponCode} onChange={(e) => setCouponCode(e.target.value)} placeholder="Enter coupon code" />
+                    <button type="button" onClick={applyCoupon} disabled={couponLoading}>{couponLoading ? 'Checking...' : 'Apply'}</button>
+                  </div>
+                  {couponMessage && <div style={{ marginTop: 6, fontSize: 12, color: couponMessage.startsWith('Applied') ? '#2f7d32' : '#b00020' }}>{couponMessage}</div>}
+                </span>
+              </div>
+              {couponDiscount > 0 && <div className="info-row total"><span className="label">After Coupon</span><span className="value">Rs {finalPayableNow.toLocaleString()}</span></div>}
             </div>
           </div>
 

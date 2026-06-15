@@ -12,6 +12,7 @@ import {
   clearPaymentSimulation,
 } from '../services/hdfcVyapar'
 import { api } from '../services/api'
+import useSEO from '../hooks/useSEO'
 
 const staticMap = Object.fromEntries(PACKAGES.map((p) => [p.slug, p]))
 
@@ -58,6 +59,14 @@ export default function Payment() {
   const campaignName = campaign?.name || staticPkg?.title
   const subtitle = campaign ? `${campaign.location}${campaign.city ? `, ${campaign.city}` : ''}` : staticPkg?.location
   const pricePerPerson = Number(campaign?.price || staticPkg?.pricePerPerson || 0)
+
+  useSEO({
+    title: campaignName ? `Register for ${campaignName}` : 'Register for Workshop',
+    description: subtitle ? `Register for ${campaignName || 'a Rug Circle workshop'} in ${subtitle}. Secure corporate team booking and payment.` : 'Register for a Rug Circle workshop and complete secure payment.',
+    keywords: `${campaignName || 'workshop'}, corporate registration, payment, rug tufting`,
+    canonical: slug ? `/payment/${slug}` : '/',
+    robots: 'noindex, nofollow',
+  })
 
   const qty = isPerPerson ? people : 1
   const { subtotal, gst, total } = calculatePricing(pricePerPerson, qty)

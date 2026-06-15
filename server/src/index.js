@@ -113,6 +113,60 @@ app.get('/api/public/campaigns/:slug', async (req, res, next) => {
     next(err)
   }
 })
+app.get('/api/public/products', async (_req, res, next) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT id, title, price, description, main_image_url AS mainImageUrl, gallery_images_json AS galleryImagesJson, created_at AS createdAt
+       FROM products
+       ORDER BY id DESC`,
+    )
+    res.json({ ok: true, products: rows.map((row) => ({
+      ...row,
+      galleryImages: (() => { try { return row.galleryImagesJson ? JSON.parse(row.galleryImagesJson) : [] } catch { return [] } })(),
+    })) })
+  } catch (err) {
+    next(err)
+  }
+})
+app.get('/api/public/products/:id', async (req, res, next) => {
+  try {
+    const id = Number(req.params.id)
+    if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ ok: false, message: 'Invalid product id' })
+    const [rows] = await pool.query(
+      `SELECT id, title, price, description, main_image_url AS mainImageUrl, gallery_images_json AS galleryImagesJson, created_at AS createdAt
+       FROM products WHERE id = ? LIMIT 1`,
+      [id],
+    )
+    if (!rows[0]) return res.status(404).json({ ok: false, message: 'Product not found' })
+    const row = rows[0]
+    row.galleryImages = (() => { try { return row.galleryImagesJson ? JSON.parse(row.galleryImagesJson) : [] } catch { return [] } })()
+    res.json({ ok: true, product: row })
+  } catch (err) {
+    next(err)
+  }
+})
+app.get('/api/public/coupons/validate', async (req, res, next) => {
+  try {
+    const code = String(req.query.code || '').trim().toUpperCase()
+    const amount = Number(req.query.amount || 0)
+    if (!code) return res.status(400).json({ ok: false, message: 'Coupon code required' })
+    const [rows] = await pool.query(`SELECT * FROM coupons WHERE code = ? LIMIT 1`, [code])
+    const coupon = rows[0]
+    if (!coupon) return res.status(404).json({ ok: false, message: 'Coupon not found' })
+    const today = new Date().toISOString().slice(0, 10)
+    if (coupon.status !== 'active') return res.status(400).json({ ok: false, message: 'Coupon inactive' })
+    if (coupon.start_date && today < String(coupon.start_date).slice(0, 10)) return res.status(400).json({ ok: false, message: 'Coupon not active yet' })
+    if (coupon.end_date && today > String(coupon.end_date).slice(0, 10)) return res.status(400).json({ ok: false, message: 'Coupon expired' })
+    if (amount < Number(coupon.min_amount || 0)) return res.status(400).json({ ok: false, message: 'Order amount too low for this coupon' })
+    if (Number(coupon.usage_limit || 0) > 0 && Number(coupon.usage_count || 0) >= Number(coupon.usage_limit || 0)) return res.status(400).json({ ok: false, message: 'Coupon limit reached' })
+    let discount = coupon.discount_type === 'percent' ? Math.round((amount * Number(coupon.discount_value)) / 100) : Number(coupon.discount_value)
+    if (Number(coupon.max_discount || 0) > 0) discount = Math.min(discount, Number(coupon.max_discount))
+    discount = Math.max(0, Math.min(discount, amount))
+    res.json({ ok: true, coupon: { code: coupon.code, discountType: coupon.discount_type, discountValue: Number(coupon.discount_value), discount, minAmount: Number(coupon.min_amount || 0) } })
+  } catch (err) {
+    next(err)
+  }
+})
 app.use('/api/auth', authRoutes)
 app.use('/api/admin', adminRoutes)
 app.use('/api/user', userRoutes)

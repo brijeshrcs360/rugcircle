@@ -3,6 +3,7 @@ import { motion } from 'motion/react'
 import { useEffect, useMemo, useState } from 'react'
 import { PACKAGES, PACKAGE_DETAILS } from '../constants/packages'
 import { api } from '../services/api'
+import useSEO from '../hooks/useSEO'
 
 const staticLookup = Object.fromEntries(
   PACKAGES.map((p) => [
@@ -58,6 +59,14 @@ export default function PackageDetails() {
   }, [campaign, staticPkg])
 
   const detailsHasHtml = /<[^>]+>/.test(String(pkg?.details || ''))
+
+  useSEO({
+    title: pkg?.title || 'Workshop Details',
+    description: pkg?.subtitle ? `${pkg.subtitle}. ${pkg.details ? String(pkg.details).replace(/<[^>]+>/g, '').slice(0, 130) : ''}` : 'Corporate rug tufting workshop details, pricing, and booking information.',
+    keywords: `${pkg?.title || 'rug tufting'}, corporate workshop, team building, rug workshop`,
+    canonical: slug ? `/package/${slug}` : '/',
+    ogType: 'article',
+  })
 
   if (loading) {
     return (

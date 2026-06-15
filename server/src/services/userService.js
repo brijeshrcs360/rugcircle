@@ -34,6 +34,34 @@ async function sendOtpEmail(toEmail, otp) {
   })
 }
 
+async function sendBookingConfirmationEmail(toEmail, details) {
+  if (!config.mail.host || !config.mail.user || !config.mail.pass) return
+  const transporter = nodemailer.createTransport({
+    host: config.mail.host,
+    port: config.mail.port,
+    secure: config.mail.port === 465,
+    auth: { user: config.mail.user, pass: config.mail.pass },
+  })
+  await transporter.sendMail({
+    from: config.mail.from,
+    to: toEmail,
+    subject: `Booking confirmed: ${details.campaignName}`,
+    text: [
+      'Your Rug Circle booking is confirmed.',
+      `Booking Code: ${details.registrationCode}`,
+      `Campaign: ${details.campaignName}`,
+      `Date: ${details.workshopDate || '-'}`,
+      `Time: ${details.startTime || '-'}`,
+      `Location: ${details.location || '-'}`,
+      `City: ${details.city || '-'}`,
+      `Team Size: ${details.teamSize}`,
+      `Selected Product: ${details.selectedDesignName || '-'}`,
+      `Amount Paid: Rs ${Number(details.amountAdvance || 0).toLocaleString('en-IN')}`,
+      details.whatsappLink ? `WhatsApp: ${details.whatsappLink}` : null,
+    ].filter(Boolean).join('\n'),
+  })
+}
+
 export async function createSession(res, user, req) {
   const rawToken = randomToken(32)
   const tokenHash = sha256(rawToken)
@@ -60,7 +88,11 @@ export async function touchUserSession(sessionId) {
 }
 
 export async function createBooking(d) {
-  const [campaignRows] = await pool.query('SELECT id, name, price_pp AS price FROM campaigns WHERE slug=:slug LIMIT 1', { slug: d.campaignSlug })
+  const [campaignRows] = await pool.query(
+    `SELECT id, name, location, city, workshop_date AS workshopDate, start_time AS startTime, price_pp AS price
+     FROM campaigns WHERE slug=:slug LIMIT 1`,
+    { slug: d.campaignSlug },
+  )
   const c = campaignRows[0]
   if (!c) throw Object.assign(new Error('Campaign not found'), { status: 404 })
 
@@ -99,11 +131,25 @@ export async function createBooking(d) {
   const smsPreview = `Rug Circle booking ${code} confirmed.`
   const whatsappLink = 'https://wa.me/' + encodeURIComponent(d.mobile) + '?text=' + encodeURIComponent(smsPreview)
 
+  const bookingDetails = {
+    registrationCode: code,
+    campaignName: c.name,
+    workshopDate: c.workshopDate,
+    startTime: c.startTime,
+    location: c.location,
+    city: c.city,
+    teamSize: d.teamSize,
+    selectedDesignName: d.selectedDesignName || null,
+    amountAdvance: advance,
+    whatsappLink,
+  }
+  await sendBookingConfirmationEmail(user.email, bookingDetails)
+
   return {
     ok: true,
     booking: { id: ins.insertId, registrationCode: code, amount: advance },
     auth: { loginEmail: user.email, loginMobile: user.mobile, requiresPasswordSetup: !userRows[0]?.id && !!tempPass },
-    notify: { smsPreview, whatsappLink },
+    notify: { smsPreview, whatsappLink, bookingDetails },
   }
 }
 

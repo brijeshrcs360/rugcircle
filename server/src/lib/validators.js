@@ -16,6 +16,9 @@ export const campaignCreateSchema = z.object({
   price: z.number().positive().max(1000000),
   seatCapacity: z.number().int().min(1).max(10000),
   status: z.enum(['draft', 'active', 'closed']).default('draft'),
+  productIds: z.array(z.number()).optional(),
+  seoTitle: z.string().max(180).optional().default(''),
+  seoDescription: z.string().max(320).optional().default(''),
 })
 
 export const campaignStatusSchema = z.object({
@@ -43,4 +46,16 @@ export const productCreateSchema = z.object({
   title: z.string().min(2).max(180),
   price: z.coerce.number().positive().max(1000000),
   description: z.string().max(5000).optional().default(''),
+})
+
+export const couponCreateSchema = z.object({
+  code: z.string().min(2).max(40),
+  discountType: z.enum(['percent', 'fixed']),
+  discountValue: z.coerce.number().positive().max(1000000),
+  minAmount: z.coerce.number().min(0).max(1000000).optional().default(0),
+  maxDiscount: z.coerce.number().min(0).max(1000000).optional().default(0),
+  startDate: z.string().optional().nullable(),
+  endDate: z.string().optional().nullable(),
+  usageLimit: z.coerce.number().int().min(0).max(1000000).optional().default(0),
+  status: z.enum(['active', 'inactive']).default('active'),
 })

@@ -53,6 +53,61 @@ async function ensureCampaignContentProductIds(conn, dbName) {
   }
 }
 
+async function ensureCouponsTable(conn, dbName) {
+  const [tbl] = await conn.query("SELECT COUNT(*) cnt FROM information_schema.TABLES WHERE TABLE_SCHEMA=? AND TABLE_NAME='coupons'", [dbName])
+  if (!tbl[0].cnt) {
+    await conn.query(`
+      CREATE TABLE coupons (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        code VARCHAR(40) NOT NULL,
+        discount_type ENUM('percent','fixed') NOT NULL,
+        discount_value DECIMAL(10,2) NOT NULL,
+        min_amount DECIMAL(10,2) NOT NULL DEFAULT 0,
+        max_discount DECIMAL(10,2) NOT NULL DEFAULT 0,
+        usage_limit INT UNSIGNED NOT NULL DEFAULT 0,
+        usage_count INT UNSIGNED NOT NULL DEFAULT 0,
+        status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+        start_date DATE NULL,
+        end_date DATE NULL,
+        created_by BIGINT UNSIGNED NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        UNIQUE KEY uq_coupons_code (code),
+        KEY idx_coupons_status_dates (status, start_date, end_date),
+        CONSTRAINT fk_coupons_created_by FOREIGN KEY (created_by) REFERENCES admin_users(id) ON DELETE SET NULL
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `)
+  }
+}
+
+async function ensureLeadsTable(conn, dbName) {
+  const [tbl] = await conn.query("SELECT COUNT(*) cnt FROM information_schema.TABLES WHERE TABLE_SCHEMA=? AND TABLE_NAME='leads'", [dbName])
+  if (!tbl[0].cnt) {
+    await conn.query(`
+      CREATE TABLE leads (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        name VARCHAR(140) NOT NULL,
+        company VARCHAR(180) NULL,
+        email VARCHAR(190) NOT NULL,
+        phone VARCHAR(32) NULL,
+        team_size VARCHAR(40) NULL,
+        interest VARCHAR(120) NULL,
+        date_window VARCHAR(120) NULL,
+        message TEXT NULL,
+        source VARCHAR(80) NOT NULL DEFAULT 'website',
+        status ENUM('new','contacted','qualified','won','lost') NOT NULL DEFAULT 'new',
+        whatsapp_link VARCHAR(500) NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        KEY idx_leads_status_created (status, created_at),
+        KEY idx_leads_email (email)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `)
+  }
+}
+
 ;(async () => {
   const conn = await mysql.createConnection(cfg)
   await conn.query(sql)
@@ -60,6 +115,8 @@ async function ensureCampaignContentProductIds(conn, dbName) {
   await ensureCampaignTypeColumn(conn, process.env.DB_NAME)
   await ensureSeasonalLabelColumn(conn, process.env.DB_NAME)
   await ensureCampaignContentProductIds(conn, process.env.DB_NAME)
+  await ensureCouponsTable(conn, process.env.DB_NAME)
+  await ensureLeadsTable(conn, process.env.DB_NAME)
   const [tables] = await conn.query('SHOW TABLES')
   console.log('Schema applied. Tables:', tables.map((row) => Object.values(row)[0]).join(', '))
   await conn.end()

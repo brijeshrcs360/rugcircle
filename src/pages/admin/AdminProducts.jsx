@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { api } from '../../services/api'
+import useSEO from '../../hooks/useSEO'
 
 const API_ROOT = import.meta.env.DEV ? 'http://localhost:8787' : window.location.origin
 
@@ -10,12 +12,20 @@ function fullImageUrl(path) {
 }
 
 export default function AdminProducts() {
+  useSEO({
+    title: 'Admin Products',
+    description: 'Manage Rug Circle products, pricing, descriptions, and gallery images.',
+    canonical: '/admin/products',
+    robots: 'noindex, nofollow',
+  })
+
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [error, setError] = useState('')
   const [editingProduct, setEditingProduct] = useState(null)
+  const [importJson, setImportJson] = useState('[]')
 
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState({
@@ -109,9 +119,32 @@ export default function AdminProducts() {
     }
   }
 
+  const exportProducts = async () => {
+    const res = await api.exportProducts()
+    const blob = new Blob([JSON.stringify(res.products || [], null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'products-export.json'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const importProducts = async () => {
+    const parsed = JSON.parse(importJson || '[]')
+    await api.importProducts({ products: parsed })
+    await load()
+  }
+
   return (
     <section className="admin-card">
       <h2>{isEdit ? `Edit Product #${editingId}` : 'Create Product'}</h2>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+        <button type="button" onClick={exportProducts}>Export</button>
+        <button type="button" onClick={importProducts}>Import JSON</button>
+        <Link className="admin-link-btn" to="/product/1">Open public product page</Link>
+      </div>
+      <textarea value={importJson} onChange={(e) => setImportJson(e.target.value)} style={{ width: '100%', minHeight: 90, border: '1.5px solid var(--color-border)', borderRadius: 10, padding: 10, marginBottom: 12 }} />
       {error && <div className="admin-error" style={{ marginBottom: 12 }}>{error}</div>}
 
       <form className="admin-form-grid" style={{ gridTemplateColumns: '1fr 1fr' }} onSubmit={onSubmit}>

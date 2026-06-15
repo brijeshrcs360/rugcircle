@@ -34,6 +34,7 @@ export default function AdminLayout() {
           <NavLink to="/admin/campaigns" className={({ isActive }) => `admin-side-link ${isActive ? 'active' : ''}`}>Campaigns</NavLink>
           <NavLink to="/admin/registrations" className={({ isActive }) => `admin-side-link ${isActive ? 'active' : ''}`}>Registrations</NavLink>
           <NavLink to="/admin/products" className={({ isActive }) => `admin-side-link ${isActive ? 'active' : ''}`}>Products</NavLink>
+          <NavLink to="/admin/leads" className={({ isActive }) => `admin-side-link ${isActive ? 'active' : ''}`}>Leads</NavLink>
         </nav>
 
         <div className="admin-sidebar-panel admin-quick-actions">
@@ -41,6 +42,7 @@ export default function AdminLayout() {
           <Link to="/admin/campaigns/new" className="admin-quick-link">New campaign</Link>
           <Link to="/admin/registrations" className="admin-quick-link">All registrations</Link>
           <Link to="/admin/products" className="admin-quick-link">Manage products</Link>
+          <Link to="/admin/leads" className="admin-quick-link">Review leads</Link>
         </div>
 
         <button className="admin-logout-btn" onClick={signOut}>Logout</button>

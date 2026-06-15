@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import Quill from 'quill'
 import 'quill/dist/quill.snow.css'
 import { api } from '../services/api'
+import useSEO from '../hooks/useSEO'
 
 const CAMPAIGN_TYPE_OPTIONS = [
   { value: 'city_workshop', label: 'Workshop in City' },
@@ -134,6 +135,13 @@ function RichTextField({ label, value, onChange }) {
 }
 
 export default function AdminCampaignEditor() {
+  useSEO({
+    title: 'Campaign Editor',
+    description: 'Edit campaign basics, products, and content for Rug Circle campaigns.',
+    canonical: '/admin/campaign/:id',
+    robots: 'noindex, nofollow',
+  })
+
   const { id } = useParams()
   const navigate = useNavigate()
 
