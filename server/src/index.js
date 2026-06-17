@@ -15,6 +15,22 @@ const app = express()
 app.set('trust proxy', 1)
 
 app.use(helmet({
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: {
+      defaultSrc: ["'self'"],
+      baseUri: ["'self'"],
+      frameAncestors: ["'none'"],
+      objectSrc: ["'none'"],
+      imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'", 'https://checkout.razorpay.com'],
+      connectSrc: ["'self'", 'https:'],
+      fontSrc: ["'self'", 'data:', 'https:'],
+      formAction: ["'self'"],
+      upgradeInsecureRequests: [],
+    },
+  },
   crossOriginResourcePolicy: false,
   crossOriginEmbedderPolicy: false,
 }))
@@ -25,6 +41,9 @@ app.use('/uploads', (req, res, next) => {
   res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin')
   next()
 }, express.static(path.resolve(process.cwd(), 'server', 'uploads')))
+
+const clientDist = path.resolve(process.cwd(), 'dist')
+app.use(express.static(clientDist))
 
 app.use(
   '/api/auth',
@@ -172,6 +191,14 @@ app.use('/api/admin', adminRoutes)
 app.use('/api/user', userRoutes)
 
 app.use(errorHandler)
+
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api/')) return next()
+  if (req.path.startsWith('/uploads/')) return next()
+  res.sendFile(path.join(clientDist, 'index.html'), (err) => {
+    if (err) next(err)
+  })
+})
 
 app.listen(config.port, () => {
   console.log(`API listening on ${config.port}`)
