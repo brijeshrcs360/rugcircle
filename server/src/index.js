@@ -1,6 +1,6 @@
 import express from 'express'
 import path from 'node:path'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import helmet from 'helmet'
 import cors from 'cors'
 import cookieParser from 'cookie-parser'
@@ -41,14 +41,18 @@ app.use(helmet({
 app.use(cors())
 app.use(express.json({ limit: '1mb' }))
 app.use(cookieParser(config.session.secret))
-app.use('/uploads', (req, res, next) => {
-  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin')
-  next()
-}, express.static(path.resolve(process.cwd(), 'server', 'uploads')))
+const uploadsDir = path.resolve(process.cwd(), 'server', 'uploads')
+if (existsSync(uploadsDir)) {
+  app.use('/uploads', (req, res, next) => {
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin')
+    next()
+  }, express.static(uploadsDir))
+}
 
 const clientDist = path.resolve(process.cwd(), 'dist')
-const clientIndexHtml = readFileSync(path.join(clientDist, 'index.html'), 'utf8')
-app.use(express.static(clientDist))
+const clientIndexPath = path.join(clientDist, 'index.html')
+const clientIndexHtml = existsSync(clientIndexPath) ? readFileSync(clientIndexPath, 'utf8') : null
+if (existsSync(clientDist)) app.use(express.static(clientDist))
 
 app.use(
   '/api/auth',
@@ -198,6 +202,7 @@ app.use('/api/user', userRoutes)
 app.use(errorHandler)
 
 function serveClientShell(req, res) {
+  if (!clientIndexHtml) return res.status(503).type('text').send('Client build not available')
   res.type('html').status(200).send(clientIndexHtml)
 }
 
