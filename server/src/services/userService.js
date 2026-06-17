@@ -19,19 +19,25 @@ function otpCode() { return String(Math.floor(100000 + Math.random() * 900000)) 
 function tempPassword() { return `RC${Math.random().toString(36).slice(2, 8).toUpperCase()}9` }
 
 async function sendOtpEmail(toEmail, otp) {
-  if (!config.mail.host || !config.mail.user || !config.mail.pass) return
+  if (!config.mail.host || !config.mail.user || !config.mail.pass) {
+    throw Object.assign(new Error('SMTP not configured'), { status: 503 })
+  }
   const transporter = nodemailer.createTransport({
     host: config.mail.host,
     port: config.mail.port,
     secure: config.mail.port === 465,
     auth: { user: config.mail.user, pass: config.mail.pass },
   })
-  await transporter.sendMail({
-    from: config.mail.from,
-    to: toEmail,
-    subject: 'Your Rug Circle verification code',
-    text: `Your verification code is ${otp}. It is valid for ${otpTtlMinutes} minutes.`,
-  })
+  try {
+    await transporter.sendMail({
+      from: config.mail.from,
+      to: toEmail,
+      subject: 'Your Rug Circle verification code',
+      text: `Your verification code is ${otp}. It is valid for ${otpTtlMinutes} minutes.`,
+    })
+  } catch (err) {
+    throw Object.assign(new Error(`OTP email send failed: ${err.message}`), { status: 502 })
+  }
 }
 
 async function sendBookingConfirmationEmail(toEmail, details) {
