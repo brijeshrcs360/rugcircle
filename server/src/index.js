@@ -1,5 +1,6 @@
 import express from 'express'
 import path from 'node:path'
+import { readFileSync } from 'node:fs'
 import helmet from 'helmet'
 import cors from 'cors'
 import cookieParser from 'cookie-parser'
@@ -43,6 +44,7 @@ app.use('/uploads', (req, res, next) => {
 }, express.static(path.resolve(process.cwd(), 'server', 'uploads')))
 
 const clientDist = path.resolve(process.cwd(), 'dist')
+const clientIndexHtml = readFileSync(path.join(clientDist, 'index.html'), 'utf8')
 app.use(express.static(clientDist))
 
 app.use(
@@ -196,9 +198,7 @@ app.use((req, res, next) => {
   if (req.method !== 'GET') return next()
   if (req.path.startsWith('/api/')) return next()
   if (req.path.startsWith('/uploads/')) return next()
-  res.sendFile(path.join(clientDist, 'index.html'), (err) => {
-    if (err) next(err)
-  })
+  res.type('html').status(200).send(clientIndexHtml)
 })
 
 app.listen(config.port, () => {
