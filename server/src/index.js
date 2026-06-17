@@ -194,11 +194,18 @@ app.use('/api/user', userRoutes)
 
 app.use(errorHandler)
 
+function serveClientShell(req, res) {
+  res.type('html').status(200).send(clientIndexHtml)
+}
+
+app.get('/admin/login', serveClientShell)
+app.get('/user/login', serveClientShell)
+
 app.use((req, res, next) => {
-  if (req.method !== 'GET') return next()
+  if (req.method !== 'GET' && req.method !== 'HEAD') return next()
   if (req.path.startsWith('/api/')) return next()
   if (req.path.startsWith('/uploads/')) return next()
-  res.type('html').status(200).send(clientIndexHtml)
+  serveClientShell(req, res)
 })
 
 app.listen(config.port, () => {
